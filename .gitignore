@@ -1,4 +1,6 @@
-data/*.txt
+data_with_type/*.txt
+data_without_type/*.txt
 raw-data/*.txt
 practice.ipynb
 awd_lstm/*
+corpus.*
