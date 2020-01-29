@@ -1,3 +1,6 @@
+AWDM_LSTM_PATH = "./awd-lstm-lm/"
+import sys
+sys.path.insert(0, AWDM_LSTM_PATH)
 from awd_lstm.model import RNNModel
 ###############################################################################
 # Build the models
@@ -6,7 +9,7 @@ from awd_lstm.model import RNNModel
 from awd_lstm.splitcross import SplitCrossEntropyLoss
 
 
-def get_model(model_type, corpus, em_size, n_hid, n_layers,args):
+def get_model(model_type, corpus, em_size, n_hid, n_layers, args):
     n_tokens = len(corpus.dictionary)
     model = RNNModel(model_type, n_tokens, em_size, n_hid, n_layers, args.dropout, args.dropouth, args.dropouti, args.dropoute, args.wdrop, args.tied)
     ###
@@ -21,7 +24,7 @@ def get_model(model_type, corpus, em_size, n_hid, n_layers,args):
         # WikiText-103
         splits = [2800, 20000, 76000]
     print('Using', splits)
-    criterion = SplitCrossEntropyLoss(args.emsize, splits=splits, verbose=False)
+    criterion = SplitCrossEntropyLoss(em_size, splits=splits, verbose=False)
 
     if args.cuda:
         model = model.cuda()
