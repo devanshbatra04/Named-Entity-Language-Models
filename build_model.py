@@ -1,3 +1,6 @@
+AWDM_LSTM_PATH = "./awd-lstm-lm/"
+import sys
+sys.path.insert(0, AWDM_LSTM_PATH)
 from awd_lstm.model import RNNModel
 ###############################################################################
 # Build the models
