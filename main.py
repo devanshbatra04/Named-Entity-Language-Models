@@ -2,19 +2,27 @@ AWDM_LSTM_PATH = "./awd-lstm-lm/"
 import sys
 sys.path.insert(0, AWDM_LSTM_PATH)
 import argparse
-from data_utils import load_datasets
+import math
+from data_utils import load_datasets, model_load, model_save
 from awd_lstm.utils import batchify
-from build_model import get_model
+from build_model import get_model, train_and_eval
+import torch
 
 DATA_WITH_TYPES = "./data_with_type"
 DATA_WITHOUT_TYPES = "./data_without_type"
 EVAL_BATCH_SIZE = 10
 TEST_BATCH_SIZE = 1
 BATCH_SIZE = 80
+
 EMBEDDING_SIZE = 400
 NUM_HIDDEN_UNITS_PER_LAYER = 1150
 NUM_LAYERS = 3
 MODEL_TYPE = 'LSTM'
+
+LR = 30
+OPTIMIZER = 'adam'
+WDECAY = 1.2e-6
+EPOCHS = 8000
 
 parser = argparse.ArgumentParser(description='PyTorch Named Entity Language Model (re-implemented by Yash and Devansh)')
 parser.add_argument('--cuda', action='store_true',
@@ -38,13 +46,18 @@ args.tied = True
 if __name__ == "__main__":
     corpus_with_types, corpus_without_types = load_datasets(DATA_WITH_TYPES, DATA_WITHOUT_TYPES)
 
-    train_data_with_types = batchify(corpus_with_types.train, BATCH_SIZE, args)
-    val_data_with_types = batchify(corpus_with_types.valid, BATCH_SIZE, args)
-    test_data_with_types = batchify(corpus_with_types.test, BATCH_SIZE, args)
-
-    train_data_without_types = batchify(corpus_without_types.train, BATCH_SIZE, args)
-    val_data_without_types = batchify(corpus_without_types.valid, BATCH_SIZE, args)
-    test_data_without_types = batchify(corpus_without_types.test, BATCH_SIZE, args)
-
     model_with_type, criterion_model_with_type, params_model_with_type,  = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
     model_without_type, criterion_model_without_type, params_model_without_type,  = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
+
+    optimizer_model_with_type = None
+    optimizer_model_without_type = None
+    # Ensure the optimizer is optimizing params, which includes both the model's weights as well as the criterion's weight (i.e. Adaptive Softmax)
+    if OPTIMIZER == 'sgd':
+        optimizer_model_with_type = torch.optim.SGD(params_model_with_type, lr=LR, weight_decay=WDECAY)
+        optimizer_model_without_type = torch.optim.SGD(params_model_without_type, lr=LR, weight_decay=WDECAY)
+    if OPTIMIZER == 'adam':
+        optimizer_model_with_type = torch.optim.Adam(params_model_with_type, lr=LR, weight_decay=WDECAY)
+        optimizer_model_without_type = torch.optim.Adam(params_model_without_type, lr=LR, weight_decay=WDECAY)
+
+    train_and_eval(model_with_type, MODEL_TYPE, corpus_with_types, optimizer_model_with_type, criterion_model_with_type, params_model_with_type, EPOCHS, LR, args, 'model_with_types.pt')
+
