@@ -4,3 +4,5 @@ raw-data/*.txt
 practice.ipynb
 awd_lstm/*
 corpus.*
+model_with_types.pt
+model_without_types.pt
