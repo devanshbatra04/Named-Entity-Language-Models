@@ -4,6 +4,7 @@ import time
 import math
 import numpy as np
 import torch
+import torch.nn as nn
 sys.path.insert(0, AWDM_LSTM_PATH)
 from awd_lstm.model import RNNModel
 from awd_lstm.utils import get_batch, repackage_hidden, batchify
@@ -187,3 +188,88 @@ def train_and_eval(model, model_type, corpus, optimizer, criterion, params, epoc
     print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | test bpc {:8.3f}'.format(
         test_loss, math.exp(test_loss), test_loss / math.log(2)))
     print('=' * 89)
+
+def get_symbol_table(data, types):
+    id_map ={}
+    i = 0
+    for pos, tp in zip(data, types):
+        id_map.update({pos.data[0]:tp.data[0]})
+    return id_map
+
+
+def evaluate_both(type_model, entity_composite_model, data_source_without_type, data_source_type, corpus_without_types, corpus_with_types, args, batch_size=10):
+    # Turn on evaluation mode which disables dropout.
+    type_model.eval()
+    entity_composite_model.eval()
+
+    criterion = nn.CrossEntropyLoss()
+    total_loss = 0
+    total_loss2 = 0
+    total_loss_cb = 0
+
+    n_tokens_in_typed_corpus = len(corpus_with_types.dictionary)
+    n_tokens_in_untyped_corpus = len(corpus_without_types.dictionary)
+    hidden_state_entity_composite_model = entity_composite_model.init_hidden(batch_size)
+    hidden_state_type_model = type_model.init_hidden(batch_size)
+    # mcq_ids = [corpus_without_types.dictionary.word2idx[w] for w in mcq_wrd]
+
+    for batch, i in enumerate(range(0, data_source_without_type.size(0) - 1, args.bptt)):
+        data_without_type, targets_without_type = get_batch(data_source_without_type, i, args, evaluation=True)
+        data_with_type, targets_with_type = get_batch(data_source_type, i, args, evaluation=True)
+
+        data_type, targets_type = get_batch(data_source_type, i, args, evaluation=True)
+
+        if batch_size == 1:
+            hidden_state_entity_composite_model = entity_composite_model.init_hidden(batch_size)
+            hidden_state_type_model = type_model.init_hidden(batch_size)
+
+        #TODO Correct following type_model and entity_composite_model inference
+        output_type_model, hidden_state_type_model = type_model(data_with_type, hidden_state_type_model)
+        output_entity_composite_model, hidden_state_entity_composite_model = entity_composite_model(data_without_type, data_type, hidden_state_entity_composite_model)
+
+        output_type_model_flat = output_type_model.view(-1, n_tokens_in_typed_corpus)
+        output_entity_composite_model_flat = output_entity_composite_model.view(-1, n_tokens_in_untyped_corpus)
+
+        candidates_ids = set([i.data[0] for i in targets_without_type])
+
+        numwords = output_entity_composite_model_flat.size()[0]
+        symbol_table = get_symbol_table(targets_without_type, targets_with_type)
+
+        output_flat_combined = output_entity_composite_model_flat.clone()
+        for idxx in range(numwords):
+            for pos in candidates_ids:  # for all candidates
+
+                tp = symbol_table[pos]
+                var_prob = output_flat_combined.data[idxx][pos]
+                type_prob = output_type_model_flat.data[idxx][tp]
+                new_prob1 = 2 * var_prob  # just to scale values, empirical
+
+                if corpus_without_types.dictionary.idx2word[pos] != corpus_with_types.dictionary.idx2word[tp]:
+                    new_prob1 = (var_prob + type_prob)  # / 2
+                output_flat_combined.data[idxx][pos] = new_prob1
+
+        total_loss += len(data_without_type) * criterion(output_entity_composite_model_flat, targets_without_type).data
+        total_loss2 += len(data_with_type) * criterion(output_type_model_flat, targets_with_type).data
+        total_loss_cb += len(data_without_type) * criterion(output_flat_combined, targets_without_type).data
+
+
+        # print (' soccer: ', len(data) * criterion(output_flat, targets).data), ' my: ',  len(data) * criterion(output_flat_cb, targets).data
+        if batch % 500 == 0:
+            # print(' only ingred not avg')
+            # print ("done batch ", batch, ' of ', len(data_source)/ eval_batch_size)
+            test_loss_cb = total_loss_cb[0] / len(data_source_without_type)
+            test_loss = total_loss[0] / len(data_source_without_type)
+            test_loss2 = total_loss2[0] / len(data_source_without_type)
+            p = (100 * batch) / (33000)
+            print('=' * 160)
+            print(
+                '| after: {:5.2f}% | test var loss {:5.2f} | test var ppl {:8.2f} | test type loss {:5.2f} | test type ppl {:8.2f} | test cb loss {:5.2f} | test cb ppl {:8.2f}'.format(
+                    p, test_loss, math.exp(test_loss), test_loss2, math.exp(test_loss2), test_loss_cb,
+                    math.exp(test_loss_cb)))
+            print('=' * 160)
+
+        hidden_state_entity_composite_model = repackage_hidden(hidden_state_entity_composite_model)
+        hidden_state_type_model = repackage_hidden(hidden_state_type_model)
+
+    return total_loss[0] / len(data_source_without_type), total_loss2[0] / len(data_source_type), total_loss_cb[0] / len(data_source_without_type)
+
