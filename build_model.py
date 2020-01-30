@@ -43,7 +43,7 @@ def get_model(model_type, corpus, em_size, n_hid, n_layers, args):
     return model, criterion, params
 
 
-def evaluate(model, criterion, model_type, data_source, args, batch_size=10):
+def evaluate(model, criterion, model_type, args, data_source, batch_size=10):
     # Turn on evaluation mode which disables dropout.
     model.eval()
     if model_type == 'QRNN':
@@ -132,7 +132,7 @@ def train_and_eval(model, model_type, corpus, optimizer, criterion, params, epoc
                     tmp[prm] = prm.data.clone()
                     prm.data = optimizer.state[prm]['ax'].clone()
 
-                val_loss2 = evaluate(val_data)
+                val_loss2 = evaluate(model, criterion, model_type, args, val_data)
                 print('-' * 89)
                 print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                       'valid ppl {:8.2f} | valid bpc {:8.3f}'.format(
@@ -148,7 +148,7 @@ def train_and_eval(model, model_type, corpus, optimizer, criterion, params, epoc
                     prm.data = tmp[prm].clone()
 
             else:
-                val_loss = evaluate(val_data, eval_batch_size)
+                val_loss = evaluate(model, criterion, model_type, args, val_data, eval_batch_size)
                 print('-' * 89)
                 print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                       'valid ppl {:8.2f} | valid bpc {:8.3f}'.format(
@@ -182,7 +182,7 @@ def train_and_eval(model, model_type, corpus, optimizer, criterion, params, epoc
     model_load(args.save)
 
     # Run on test data.
-    test_loss = evaluate(test_data, test_batch_size)
+    test_loss = evaluate(model, criterion, model_type, args, test_data, test_batch_size)
     print('=' * 89)
     print('| End of training | test loss {:5.2f} | test ppl {:8.2f} | test bpc {:8.3f}'.format(
         test_loss, math.exp(test_loss), test_loss / math.log(2)))
