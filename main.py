@@ -1,5 +1,6 @@
 AWDM_LSTM_PATH = "./awd-lstm-lm/"
 import sys
+import os
 sys.path.insert(0, AWDM_LSTM_PATH)
 import argparse
 import math
@@ -46,12 +47,13 @@ args.tied = True
 if __name__ == "__main__":
     corpus_with_types, corpus_without_types = load_datasets(DATA_WITH_TYPES, DATA_WITHOUT_TYPES)
 
-    model_with_type, criterion_model_with_type, params_model_with_type,  = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
-    model_without_type, criterion_model_without_type, params_model_without_type,  = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
+    model_with_type, criterion_model_with_type, params_model_with_type = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
+    model_without_type, criterion_model_without_type, params_model_without_type = get_model(MODEL_TYPE, corpus_with_types, EMBEDDING_SIZE, NUM_HIDDEN_UNITS_PER_LAYER, NUM_LAYERS, args)
 
     optimizer_model_with_type = None
     optimizer_model_without_type = None
-    # Ensure the optimizer is optimizing params, which includes both the model's weights as well as the criterion's weight (i.e. Adaptive Softmax)
+    # Ensure the optimizer is optimizing params, which includes both the model's weights as well as the criterion's
+    # weight (i.e. Adaptive Softmax)
     if OPTIMIZER == 'sgd':
         optimizer_model_with_type = torch.optim.SGD(params_model_with_type, lr=LR, weight_decay=WDECAY)
         optimizer_model_without_type = torch.optim.SGD(params_model_without_type, lr=LR, weight_decay=WDECAY)
@@ -59,5 +61,12 @@ if __name__ == "__main__":
         optimizer_model_with_type = torch.optim.Adam(params_model_with_type, lr=LR, weight_decay=WDECAY)
         optimizer_model_without_type = torch.optim.Adam(params_model_without_type, lr=LR, weight_decay=WDECAY)
 
-    train_and_eval(model_with_type, MODEL_TYPE, corpus_with_types, optimizer_model_with_type, criterion_model_with_type, params_model_with_type, EPOCHS, LR, args, 'model_with_types.pt')
+    if not (os.path.exists('model_with_types.pt')):
+        train_and_eval(model_with_type, MODEL_TYPE, corpus_with_types, optimizer_model_with_type,
+                       criterion_model_with_type, params_model_with_type, EPOCHS, LR, args, 'model_with_types.pt')
+
+    if not (os.path.exists('model_without_types.pt')):
+        train_and_eval(model_without_type, MODEL_TYPE, corpus_without_types, optimizer_model_without_type,
+                       criterion_model_without_type, params_model_without_type, EPOCHS, LR, args,
+                       'model_without_types.pt')
 
