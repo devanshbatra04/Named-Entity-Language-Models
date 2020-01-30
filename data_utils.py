@@ -8,15 +8,15 @@ import hashlib
 ###############################################################################
 
 
-def model_save(fn):
+def model_save(fn, model, criterion, optimizer):
     with open(fn, 'wb') as f:
         torch.save([model, criterion, optimizer], f)
 
 
 def model_load(fn):
-    global model, criterion, optimizer
     with open(fn, 'rb') as f:
         model, criterion, optimizer = torch.load(f)
+        return model, criterion, optimizer
 
 
 def load_datasets(dataset_with_types, dataset_without_types):
